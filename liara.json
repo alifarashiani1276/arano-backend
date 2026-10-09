@@ -1,0 +1,7 @@
+{
+    "laravel": {
+        "phpVersion": "8.3",
+        "configCache": true,
+        "routeCache": true
+    }
+}
