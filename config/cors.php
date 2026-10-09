@@ -21,7 +21,7 @@ return [
         'trim',
         explode(',', (string) env(
             'CORS_ALLOWED_ORIGINS',
-            'https://aranogroup.ir,https://www.aranogroup.ir,http://localhost:5173'
+            'https://arano.liara.run/'
         ))
     ))),
 
