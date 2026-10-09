@@ -53,7 +53,44 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinutes(10, 5)
                 ->by($phone . '|' . $request->ip());
         });
+        // محدودیت ارسال OTP برای بازیابی رمز مدیر
+        RateLimiter::for('admin-password-reset-send', function (Request $request) {
+            $phone = trim((string) $request->input('phone'));
 
+            return [
+                Limit::perMinutes(10, 3)
+                    ->by($phone . '|' . $request->ip()),
+
+                Limit::perMinutes(10, 20)
+                    ->by($request->ip()),
+            ];
+        });
+
+// محدودیت تأیید OTP بازیابی رمز مدیر
+        RateLimiter::for('admin-password-reset-verify', function (Request $request) {
+            $phone = trim((string) $request->input('phone'));
+
+            return [
+                Limit::perMinutes(10, 5)
+                    ->by($phone . '|' . $request->ip()),
+
+                Limit::perMinutes(10, 20)
+                    ->by($request->ip()),
+            ];
+        });
+
+// محدودیت ثبت رمز جدید
+        RateLimiter::for('admin-password-reset-reset', function (Request $request) {
+            $adminId = $request->user()?->id ?? 'guest';
+
+            return [
+                Limit::perMinutes(10, 5)
+                    ->by($adminId . '|' . $request->ip()),
+
+                Limit::perMinutes(10, 20)
+                    ->by($request->ip()),
+            ];
+        });
         /*
          * Admin OTP Verify
          */

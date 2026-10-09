@@ -53,6 +53,24 @@ Route::prefix('admin/auth')->group(function () {
     // ورود نهایی با Password
     Route::post('/login', [AdminAuthController::class, 'login'])
         ->middleware('throttle:admin-login');
+    // بازیابی رمز عبور مدیر
+    Route::post(
+        '/forgot-password/send-otp',
+        [AdminAuthController::class, 'sendPasswordResetOtp']
+    )->middleware('throttle:admin-password-reset-send');
+
+    Route::post(
+        '/forgot-password/verify-otp',
+        [AdminAuthController::class, 'verifyPasswordResetOtp']
+    )->middleware('throttle:admin-password-reset-verify');
+
+    Route::post(
+        '/forgot-password/reset',
+        [AdminAuthController::class, 'resetPassword']
+    )->middleware([
+    'auth:sanctum',
+    'throttle:admin-password-reset-reset',
+]);
     Route::post('/complete-profile', [AdminAuthController::class, 'completeProfile'])
         ->middleware(['auth:sanctum', 'admin.setup']);
 });

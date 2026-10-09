@@ -7,23 +7,49 @@ use App\Services\Sms\SmsSender;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 
 class OtpService
 {
+    public const PURPOSE_USER_AUTH = 'user_auth';
+    public const PURPOSE_ADMIN_AUTH = 'admin_auth';
+    public const PURPOSE_ADMIN_PASSWORD_RESET = 'admin_password_reset';
+
     public function __construct(
         private readonly SmsSender $smsSender
     ) {
     }
 
     /**
-     * ایجاد OTP جدید
-     *
-     * این متد برای Tinker و سایر مصرف‌کننده‌های داخلی
-     * همچنان کد OTP را برمی‌گرداند.
+     * بررسی معتبر بودن کاربرد OTP
      */
-    public function generate(string $phone): string
+    private function validatePurpose(string $purpose): void
     {
+        $allowedPurposes = [
+            self::PURPOSE_USER_AUTH,
+            self::PURPOSE_ADMIN_AUTH,
+            self::PURPOSE_ADMIN_PASSWORD_RESET,
+        ];
+
+        if (!in_array($purpose, $allowedPurposes, true)) {
+            throw new InvalidArgumentException(
+                'Invalid OTP purpose.'
+            );
+        }
+    }
+
+    /**
+     * ایجاد OTP جدید
+     */
+    public function generate(
+        string $phone,
+        string $purpose = self::PURPOSE_USER_AUTH
+    ): string {
+        $this->validatePurpose($purpose);
+
+        // فقط OTPهای استفاده‌نشده همین کاربرد باطل می‌شوند.
         OtpCode::where('phone', $phone)
+            ->where('purpose', $purpose)
             ->whereNull('used_at')
             ->update([
                 'used_at' => now(),
@@ -33,17 +59,16 @@ class OtpService
 
         OtpCode::create([
             'phone' => $phone,
+            'purpose' => $purpose,
             'code' => Hash::make($code),
             'expires_at' => now()->addMinutes(2),
         ]);
 
-        /*
-         * فقط در محیط توسعه کد OTP را Log می‌کنیم.
-         * در Production هرگز OTP خام داخل Log قرار نمی‌گیرد.
-         */
-        if (!app()->environment('production')) {
+        // ثبت OTP خام فقط در محیط توسعه
+        if (app()->environment(['local', 'testing'])) {
             Log::info('Development OTP generated.', [
                 'phone' => $phone,
+                'purpose' => $purpose,
                 'code' => $code,
             ]);
         }
@@ -54,23 +79,32 @@ class OtpService
     /**
      * ایجاد و ارسال OTP
      */
-    public function send(string $phone): void
-    {
-        $code = $this->generate($phone);
+    public function send(
+        string $phone,
+        string $purpose = self::PURPOSE_USER_AUTH
+    ): void {
+        $code = $this->generate($phone, $purpose);
 
-        $this->smsSender->send(
-            $phone,
-            $code
-        );
+        $this->smsSender->send($phone, $code);
     }
 
     /**
      * بررسی و مصرف اتمیک OTP
      */
-    public function verify(string $phone, string $code): bool
-    {
-        return DB::transaction(function () use ($phone, $code) {
+    public function verify(
+        string $phone,
+        string $code,
+        string $purpose = self::PURPOSE_USER_AUTH
+    ): bool {
+        $this->validatePurpose($purpose);
+
+        return DB::transaction(function () use (
+            $phone,
+            $code,
+            $purpose
+        ) {
             $otp = OtpCode::where('phone', $phone)
+                ->where('purpose', $purpose)
                 ->whereNull('used_at')
                 ->latest('id')
                 ->lockForUpdate()

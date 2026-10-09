@@ -3,7 +3,6 @@
 namespace App\Services\Sms;
 
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class KavenegarSmsSender implements SmsSender
@@ -14,11 +13,15 @@ class KavenegarSmsSender implements SmsSender
         $template = config('services.sms.kavenegar.otp_template');
 
         if (empty($apiKey)) {
-            throw new RuntimeException('Kavenegar API key is not configured.');
+            throw new RuntimeException(
+                'Kavenegar API key is not configured.'
+            );
         }
 
         if (empty($template)) {
-            throw new RuntimeException('Kavenegar OTP template is not configured.');
+            throw new RuntimeException(
+                'Kavenegar OTP template is not configured.'
+            );
         }
 
         $url = sprintf(
@@ -27,8 +30,7 @@ class KavenegarSmsSender implements SmsSender
         );
 
         try {
-           $response = Http::asForm()
-               ->withOptions(['verify' => !app()->environment('local')])
+            $response = Http::asForm()
                 ->timeout(10)
                 ->connectTimeout(5)
                 ->post($url, [
@@ -37,23 +39,36 @@ class KavenegarSmsSender implements SmsSender
                     'template' => $template,
                 ]);
         } catch (\Throwable $e) {
-            Log::error('Kavenegar connection failed', ['error' => $e->getMessage()]);
+            throw new RuntimeException(
+                'ارتباط با سرویس پیامکی برقرار نشد.',
+                0,
+                $e
+            );
+        }
 
-            throw new RuntimeException('ارتباط با سرویس پیامکی برقرار نشد.', 0, $e);
+        if (!$response->successful()) {
+            throw new RuntimeException(
+                'سرویس پیامکی درخواست را قبول نکرد.'
+            );
         }
 
         $data = $response->json();
-        $status = (int) data_get($data, 'return.status');
 
-        if (!$response->successful() || $status !== 200) {
-            Log::error('Kavenegar send failed', [
-                'http_status' => $response->status(),
-                'kavenegar_status' => $status,
-                'message' => data_get($data, 'return.message'),
-            ]);
+        /*
+         * Kavenegar ممکن است HTTP 200 برگرداند،
+         * ولی status داخلی API نشان‌دهنده خطا باشد.
+         */
+        $status = data_get($data, 'return.status');
+
+        if ((int) $status !== 200) {
+            $message = data_get(
+                $data,
+                'return.message',
+                'خطا در ارسال پیامک.'
+            );
 
             throw new RuntimeException(
-                'Kavenegar error ' . $status . ': ' . data_get($data, 'return.message', 'unknown')
+                "Kavenegar error: {$message}"
             );
         }
     }

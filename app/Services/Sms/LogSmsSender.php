@@ -7,16 +7,11 @@ use RuntimeException;
 
 class LogSmsSender implements SmsSender
 {
-    /**
-     * Driver مخصوص محیط توسعه
-     *
-     * در Production عمداً نباید استفاده شود.
-     */
     public function send(string $phone, string $code): void
     {
-        if (app()->environment('production')) {
+        if (!app()->environment(['local', 'testing'])) {
             throw new RuntimeException(
-                'Log SMS driver is not allowed in production.'
+                'Log SMS driver is allowed only in local/testing environments.'
             );
         }
 
