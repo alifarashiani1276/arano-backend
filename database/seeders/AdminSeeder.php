@@ -19,11 +19,19 @@ class AdminSeeder extends Seeder
             );
         }
 
-        $admin = User::where('phone', '09120000000')->first();
+        $phone = config('services.super_admin.phone');
+
+        if (empty($phone)) {
+            throw new RuntimeException(
+                'SUPER_ADMIN_PHONE در تنظیمات محیطی (env) تنظیم نشده است.'
+            );
+        }
+
+        $admin = User::where('phone', $phone)->first();
 
         if (!$admin) {
             User::create([
-                'phone' => '09120000000',
+                'phone' => $phone,
                 'password' => Hash::make($password),
                 'first_name' => 'مدیر',
                 'last_name' => 'سیستم',

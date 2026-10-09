@@ -61,6 +61,7 @@ return [
     */
 
     'super_admin' => [
+        'phone' => env('SUPER_ADMIN_PHONE'),
         'password' => env('SUPER_ADMIN_PASSWORD'),
     ],
 ];
